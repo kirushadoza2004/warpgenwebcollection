@@ -69,14 +69,14 @@ module.exports = async (req, res) => {
         const clientIPv6 = payload.config.interface.addresses?.v6 || "2606:4700:110::2";
         const peerPublicKey = payload.config.peers[0].public_key;
 
-        const endpoint = req.body?.endpoint || "162.159.192.1:2408";
+        const endpoint = req.body?.endpoint || "engage.cloudflareclient.com:2408";
         const dns = req.body?.dns || "1.1.1.1, 1.0.0.1";
 
-        const jc = Math.floor(Math.random() * 8) + 3;
-        const jmin = 40;
-        const jmax = 70;
-        const s1 = Math.floor(Math.random() * 150) + 15;
-        const s2 = Math.floor(Math.random() * 150) + 15;
+        const jc = Math.floor(Math.random() * 6) + 4; // 4 - 9
+        const jmin = 50;
+        const jmax = 100;
+        const s1 = Math.floor(Math.random() * 200) + 150; // Увеличенный размер для маскировки под TLS
+        const s2 = Math.floor(Math.random() * 200) + 150;
         const h1 = Math.floor(Math.random() * 1000000000) + 1000000;
         const h2 = Math.floor(Math.random() * 1000000000) + 1000000;
         const h3 = Math.floor(Math.random() * 1000000000) + 1000000;
