@@ -1,6 +1,5 @@
 const crypto = require('crypto');
 
-// Генерация X25519 ключей
 function generateWgKeyPair() {
     const { privateKey, publicKey } = crypto.generateKeyPairSync('x25519', {
         publicKeyEncoding: { type: 'spki', format: 'der' },
@@ -21,7 +20,6 @@ function generateWgKeyPair() {
 }
 
 module.exports = async (req, res) => {
-    // Включаем CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -37,7 +35,6 @@ module.exports = async (req, res) => {
     try {
         const keys = generateWgKeyPair();
 
-        // Запрос к Cloudflare WARP API
         const response = await fetch('https://api.cloudflareclient.com/v0a2158/reg', {
             method: 'POST',
             headers: {
@@ -55,20 +52,31 @@ module.exports = async (req, res) => {
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`Ошибка Cloudflare API: ${response.status}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !data.result) {
+            const errorMsg = data.errors && data.errors.length > 0 
+                ? data.errors[0].message 
+                : `Код ошибки API: ${response.status}`;
+            throw new Error(`Cloudflare вернул ошибку: ${errorMsg}`);
         }
 
-        const data = await response.json();
-        
-        const clientIPv4 = data.result.config.interface.addresses.v4;
-        const clientIPv6 = data.result.config.interface.addresses.v6;
-        const peerPublicKey = data.result.config.peers[0].public_key;
+        const result = data.result;
+
+        const interfaceObj = result.config?.interface || result.interface;
+        const peersObj = result.config?.peers || result.peers;
+
+        if (!interfaceObj || !peersObj || !peersObj[0]) {
+            throw new Error('Получен некорректный ответ от WARP API (отсутствуют конфигурационные данные)');
+        }
+
+        const clientIPv4 = interfaceObj.addresses?.v4 || "10.0.0.2";
+        const clientIPv6 = interfaceObj.addresses?.v6 || "fd01:5ca1:ab1e::2";
+        const peerPublicKey = peersObj[0].public_key;
 
         const endpoint = req.body?.endpoint || "162.159.192.1:2408";
         const dns = req.body?.dns || "1.1.1.1, 1.0.0.1";
 
-        // Генерация случайных параметров AmneziaWG (AWG 1.5)
         const jc = Math.floor(Math.random() * 8) + 3;
         const jmin = 40;
         const jmax = 70;
