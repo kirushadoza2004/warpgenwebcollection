@@ -20,7 +20,6 @@ function generateWgKeyPair() {
 }
 
 module.exports = async (req, res) => {
-    // Настройка CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -56,20 +55,19 @@ module.exports = async (req, res) => {
 
         const data = await response.json();
 
-        // если ответ содержит ошибку в массиве errors
         if (data.errors && data.errors.length > 0) {
             throw new Error(`Ошибка Cloudflare: ${data.errors[0].message}`);
         }
 
-        const result = data.result || data;
+        const payload = data.result || data;
 
-        if (!result.config || !result.config.interface || !result.config.peers) {
-            throw new Error('WARP API не вернул настройки конфигурации');
+        if (!payload || !payload.config || !payload.config.interface || !payload.config.peers) {
+            throw new Error('Не удалось получить конфигурацию сети от Cloudflare');
         }
 
-        const clientIPv4 = result.config.interface.addresses?.v4 || "10.0.0.2";
-        const clientIPv6 = result.config.interface.addresses?.v6 || "fd01:5ca1:ab1e::2";
-        const peerPublicKey = result.config.peers[0].public_key;
+        const clientIPv4 = payload.config.interface.addresses?.v4 || "172.16.0.2";
+        const clientIPv6 = payload.config.interface.addresses?.v6 || "2606:4700:110::2";
+        const peerPublicKey = payload.config.peers[0].public_key;
 
         const endpoint = req.body?.endpoint || "162.159.192.1:2408";
         const dns = req.body?.dns || "1.1.1.1, 1.0.0.1";
