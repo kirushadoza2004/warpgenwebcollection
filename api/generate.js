@@ -39,14 +39,15 @@ module.exports = async (req, res) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json; charset=UTF-8',
-                'User-Agent': 'okhttp/3.12.1'
+                'User-Agent': 'okhttp/3.12.1',
+                'CF-Client-Version': 'a-6.30-3596'
             },
             body: JSON.stringify({
                 "key": keys.publicKey,
                 "install_id": "",
                 "fcm_token": "",
                 "tos": new Date().toISOString(),
-                "model": "PC",
+                "model": "Android",
                 "type": "Android",
                 "locale": "ru_RU"
             })
@@ -54,24 +55,25 @@ module.exports = async (req, res) => {
 
         const data = await response.json();
 
-        if (!response.ok || !data.success || !data.result) {
-            const errorMsg = data.errors && data.errors.length > 0 
+        if (!data || data.success === false || !data.result) {
+            const detailMsg = (data.errors && data.errors.length > 0) 
                 ? data.errors[0].message 
-                : `Код ошибки API: ${response.status}`;
-            throw new Error(`Cloudflare вернул ошибку: ${errorMsg}`);
+                : JSON.stringify(data);
+            throw new Error(`Cloudflare отклонил регистрацию: ${detailMsg}`);
         }
 
         const result = data.result;
 
-        const interfaceObj = result.config?.interface || result.interface;
-        const peersObj = result.config?.peers || result.peers;
+        const configObj = result.config || result;
+        const interfaceObj = configObj.interface;
+        const peersObj = configObj.peers;
 
         if (!interfaceObj || !peersObj || !peersObj[0]) {
-            throw new Error('Получен некорректный ответ от WARP API (отсутствуют конфигурационные данные)');
+            throw new Error('WARP API не вернул настройки сети (interface/peers)');
         }
 
-        const clientIPv4 = interfaceObj.addresses?.v4 || "10.0.0.2";
-        const clientIPv6 = interfaceObj.addresses?.v6 || "fd01:5ca1:ab1e::2";
+        const clientIPv4 = interfaceObj.addresses?.v4 || interfaceObj.addresses?.[0]?.address || "10.0.0.2";
+        const clientIPv6 = interfaceObj.addresses?.v6 || interfaceObj.addresses?.[1]?.address || "fd01:5ca1:ab1e::2";
         const peerPublicKey = peersObj[0].public_key;
 
         const endpoint = req.body?.endpoint || "162.159.192.1:2408";
@@ -89,7 +91,7 @@ module.exports = async (req, res) => {
 
         const configText = `[Interface]
 PrivateKey = ${keys.privateKey}
-Address = ${clientIPv4}/32, ${clientIPv6}/128
+Address = ${clientIPv4.includes('/') ? clientIPv4 : clientIPv4 + '/32'}, ${clientIPv6.includes('/') ? clientIPv6 : clientIPv6 + '/128'}
 DNS = ${dns}
 Jc = ${jc}
 Jmin = ${jmin}
