@@ -1,0 +1,8 @@
+{
+  "name": "awg-warp-generator",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "cors": "^2.8.5"
+  }
+}

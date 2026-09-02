@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AmneziaWG WARP Generator</title>
+    <style>
+        :root {
+            --bg: #121214;
+            --card-bg: #1e1e24;
+            --accent: #ff6b00;
+            --accent-hover: #e05e00;
+            --text: #e1e1e6;
+            --muted: #a8a8b3;
+            --border: #323238;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 650px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            color: #fff;
+        }
+
+        p {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #121214;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            width: 100%;
+            background-color: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn:hover { background-color: var(--accent-hover); }
+        .btn:disabled { background-color: #505059; cursor: not-allowed; }
+
+        textarea {
+            width: 100%;
+            height: 220px;
+            background: #121214;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: #00ff66;
+            font-family: monospace;
+            padding: 12px;
+            font-size: 0.85rem;
+            resize: vertical;
+            box-sizing: border-box;
+            margin-top: 10px;
+        }
+
+        .actions { display: flex; gap: 10px; margin-top: 10px; }
+        .actions .btn { margin-top: 0; }
+        .status { margin-top: 10px; font-size: 0.85rem; color: var(--accent); min-height: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>AmneziaWG WARP Generator</h1>
+    <p>Генератор конфигураций AmneziaWG (AWG 1.5) для AmneziaVPN с обходом блокировок.</p>
+
+    <div class="field">
+        <label for="endpoint">Точка подключения (Endpoint):</label>
+        <select id="endpoint">
+            <option value="162.159.192.1:2408">Cloudflare (162.159.192.1:2408)</option>
+            <option value="162.159.193.1:2408">Cloudflare Alt (162.159.193.1:2408)</option>
+            <option value="188.114.96.1:2408">Cloudflare IPv4 (188.114.96.1:2408)</option>
+            <option value="162.159.193.5:500">Cloudflare Port 500</option>
+            <option value="custom">Свой IP:Port</option>
+        </select>
+    </div>
+
+    <div class="field hidden" id="customEndpointGroup">
+        <label for="customEndpoint">Кастомный IP:Port:</label>
+        <input type="text" id="customEndpoint" placeholder="162.159.192.1:2408">
+    </div>
+
+    <div class="field">
+        <label for="dns">DNS Серверы:</label>
+        <input type="text" id="dns" value="1.1.1.1, 1.0.0.1">
+    </div>
+
+    <button class="btn" id="generateBtn" onclick="generateConfig()">Сгенерировать</button>
+
+    <div class="status" id="statusText"></div>
+
+    <div id="resultGroup" class="hidden">
+        <textarea id="configOutput" readonly></textarea>
+        <div class="actions">
+            <button class="btn" onclick="copyConfig()">Копировать</button>
+            <button class="btn" onclick="downloadConfig()">Скачать .conf</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('endpoint').addEventListener('change', function() {
+        const customGroup = document.getElementById('customEndpointGroup');
+        if (this.value === 'custom') {
+            customGroup.classList.remove('hidden');
+        } else {
+            customGroup.classList.add('hidden');
+        }
+    });
+
+    async function generateConfig() {
+        const btn = document.getElementById('generateBtn');
+        const status = document.getElementById('statusText');
+        const resultGroup = document.getElementById('resultGroup');
+        const configOutput = document.getElementById('configOutput');
+
+        btn.disabled = true;
+        status.innerText = 'Запрос к серверу и регистрация WARP...';
+        resultGroup.classList.add('hidden');
+
+        let endpointVal = document.getElementById('endpoint').value;
+        if (endpointVal === 'custom') {
+            endpointVal = document.getElementById('customEndpoint').value.trim();
+        }
+
+        try {
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    endpoint: endpointVal,
+                    dns: document.getElementById('dns').value.trim()
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Ошибка генерации');
+            }
+
+            configOutput.value = data.config;
+            resultGroup.classList.remove('hidden');
+            status.innerText = 'Конфигурация создана!';
+        } catch (err) {
+            status.innerText = 'Ошибка: ' + err.message;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function copyConfig() {
+        const copyText = document.getElementById("configOutput");
+        copyText.select();
+        navigator.clipboard.writeText(copyText.value);
+        alert("Скопировано!");
+    }
+
+    function downloadConfig() {
+        const text = document.getElementById("configOutput").value;
+        const blob = new Blob([text], { type: "text/plain" });
+        const anchor = document.createElement("a");
+        anchor.download = "warp-amneziawg.conf";
+        anchor.href = window.URL.createObjectURL(blob);
+        anchor.click();
+    }
+</script>
+
+</body>
+</html>
