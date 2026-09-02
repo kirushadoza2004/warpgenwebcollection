@@ -20,6 +20,7 @@ function generateWgKeyPair() {
 }
 
 module.exports = async (req, res) => {
+    // Настройка CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -55,26 +56,20 @@ module.exports = async (req, res) => {
 
         const data = await response.json();
 
-        if (!data || data.success === false || !data.result) {
-            const detailMsg = (data.errors && data.errors.length > 0) 
-                ? data.errors[0].message 
-                : JSON.stringify(data);
-            throw new Error(`Cloudflare отклонил регистрацию: ${detailMsg}`);
+        // если ответ содержит ошибку в массиве errors
+        if (data.errors && data.errors.length > 0) {
+            throw new Error(`Ошибка Cloudflare: ${data.errors[0].message}`);
         }
 
-        const result = data.result;
+        const result = data.result || data;
 
-        const configObj = result.config || result;
-        const interfaceObj = configObj.interface;
-        const peersObj = configObj.peers;
-
-        if (!interfaceObj || !peersObj || !peersObj[0]) {
-            throw new Error('WARP API не вернул настройки сети (interface/peers)');
+        if (!result.config || !result.config.interface || !result.config.peers) {
+            throw new Error('WARP API не вернул настройки конфигурации');
         }
 
-        const clientIPv4 = interfaceObj.addresses?.v4 || interfaceObj.addresses?.[0]?.address || "10.0.0.2";
-        const clientIPv6 = interfaceObj.addresses?.v6 || interfaceObj.addresses?.[1]?.address || "fd01:5ca1:ab1e::2";
-        const peerPublicKey = peersObj[0].public_key;
+        const clientIPv4 = result.config.interface.addresses?.v4 || "10.0.0.2";
+        const clientIPv6 = result.config.interface.addresses?.v6 || "fd01:5ca1:ab1e::2";
+        const peerPublicKey = result.config.peers[0].public_key;
 
         const endpoint = req.body?.endpoint || "162.159.192.1:2408";
         const dns = req.body?.dns || "1.1.1.1, 1.0.0.1";
